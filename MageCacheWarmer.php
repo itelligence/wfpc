@@ -20,7 +20,8 @@ class MageCacheWarmer
         $_iNumUrls,
         $_cStatusCallback,
         $_fAvgDownloadTime,
-        $_iTotalDownloadTime;
+        $_iTotalDownloadTime,
+        $_aStreamContext;
 
     public function getAvgDownloadTime()   { return $this->_fAvgDownloadTime;   }
     public function getTotalDownloadTime() { return $this->_iTotalDownloadTime; }
@@ -30,6 +31,7 @@ class MageCacheWarmer
      */
     public function __construct($sSitemapUrl, $cStatusCallback, $iDelay=0)
     {
+        $this->_createStreamContext;
         $this->_sSitemapUrl     = $sSitemapUrl;
         $this->_cStatusCallback = $cStatusCallback;
         $this->_iDelay          = $iDelay;
@@ -143,7 +145,7 @@ class MageCacheWarmer
 
             // Note the start time and download the page
             $iPageStartTime = microtime(true);
-            file_get_contents($sUrl, false, $streamContext);
+            file_get_contents($sUrl, false, $this->_aStreamContext);
         
             // Update the total download time
             $iTotalDownloadTime += microtime(true) - $iPageStartTime;
@@ -171,18 +173,8 @@ class MageCacheWarmer
         }
         $this->_sSitemapUrl = $sSitemapUrl;
 
-        // Stream context for file_get_contents(),
-        // some webservers return a 503 error when no user agent is set.
-        $streamContext = stream_context_create(array(
-            'http' => array(
-                'header' => array(
-                    'User-Agent: WFPC Cache Warmer'
-                )
-            )
-        ));
-
         // Try downloading the sitemap file
-        $sSitemapXml = file_get_contents($sSitemapUrl, false, $streamContext);
+        $sSitemapXml = file_get_contents($sSitemapUrl, false, $this->_aStreamContext);
         if(!$sSitemapXml) {
             throw new RuntimeException(
                 'Unable to download the sitemap file at $sSitemapUrl' . PHP_EOL);
@@ -212,6 +204,22 @@ class MageCacheWarmer
 
         $this->_aSiteUrls = $oSitemap->xpath("//sitemap:loc");
         $this->_iNumUrls  = count($this->_aSiteUrls);
+    }
+
+    /**
+     * Creates a stream context.
+     */
+    private function _createStreamContext()
+    {
+        // Stream context for file_get_contents(),
+        // some webservers return a 503 error when no user agent is set.
+        return stream_context_create(array(
+            'http' => array(
+                'header' => array(
+                    'User-Agent: WFPC Cache Warmer'
+                )
+            )
+        ));
     }
 
     /**
